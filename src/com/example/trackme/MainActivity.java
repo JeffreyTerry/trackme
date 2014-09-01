@@ -1,8 +1,6 @@
 package com.example.trackme;
 
-import java.util.Deque;
-import java.util.LinkedList;
-import java.util.Queue;
+import java.util.ArrayList;
 
 import android.content.Context;
 import android.location.Location;
@@ -15,12 +13,13 @@ import android.view.MenuItem;
 import android.widget.TextView;
 
 public class MainActivity extends ActionBarActivity {
-	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 10; // in
+	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 1; // in
 																		// Meters
 	private static final long MINIMUM_TIME_BETWEEN_UPDATE = 1000; // in
 																	// Millisecond
-	
-	Deque<Long> locationChangeTimes;
+
+	ArrayList<Long> locationChangeTimes;
+	ArrayList<Double> locationLatitudes, locationLongitudes;
 	TextView tvMain;
 	TextView tvLocation;
 	double latitude = 0, longitude = 0, oLatitude = 0, oLongitude = 0;
@@ -36,9 +35,11 @@ public class MainActivity extends ActionBarActivity {
 		tvMain = (TextView) findViewById(R.id.tvMain);
 		tvLocation = (TextView) findViewById(R.id.tvLocation);
 
-		locationChangeTimes = new LinkedList<Long>();
+		locationChangeTimes = new ArrayList<Long>();
+		locationLatitudes = new ArrayList<Double>();
+		locationLongitudes = new ArrayList<Double>();
 		startTime = System.currentTimeMillis();
-		
+
 		// location stuff
 		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
@@ -125,27 +126,34 @@ public class MainActivity extends ActionBarActivity {
 	private class MyLocationListener implements LocationListener {
 
 		@Override
-		public void onLocationChanged(Location arg0) {
+		public void onLocationChanged(Location l) {
 			// TODO Auto-generated method stub
-//			Toast.makeText(MainActivity.this, "Location changed",
-//					Toast.LENGTH_LONG).show();
+			// Toast.makeText(MainActivity.this, "Location changed",
+			// Toast.LENGTH_LONG).show();
+
+			locationChangeTimes.add(System.currentTimeMillis() - startTime);
+			locationLatitudes.add(l.getLatitude());
+			locationLongitudes.add(l.getLongitude());
 
 			String tvMainText = tvMain.getText().toString();
-			if(tvMainText.contentEquals("No location changes registered yet")){
-				tvMainText = "";
+			if (tvMainText.contentEquals("No location changes registered yet")) {
+				tvMainText = "\n";
 			}
-			locationChangeTimes.add(System.currentTimeMillis() - startTime);
-			if(locationChangeTimes.size() > 15){
-				locationChangeTimes.poll();
-				tvMainText = tvMainText.substring(tvMainText.indexOf('\n'));
+			if (locationChangeTimes.size() > 20) {
+				tvMainText = tvMainText.substring(tvMainText.indexOf('\n') + 1);
 			}
-			tvMainText += "Update time: " + locationChangeTimes.peekLast() + "\n";
-			
+			tvMainText += "Update time: "
+					+ locationChangeTimes.get(locationChangeTimes.size() - 1)
+					+ "\n";
+
 			tvMain.setText(tvMainText);
-			
-			tvLocation.setText("Last GPS Position: (" + getLatitude() + ", "
-					+ getLongitude() + ")" + "\nLast Network Position: ("
-					+ getNetworkLatitude() + ", " + getNetworkLongitude() + ")");
+
+			tvLocation
+					.setText("Last GPS Position: (" + l.getLatitude() + ", "
+							+ l.getLongitude() + ")"
+							+ "\nLast Network Position: ("
+							+ getNetworkLatitude() + ", "
+							+ getNetworkLongitude() + ")");
 		}
 
 		@Override
@@ -167,4 +175,5 @@ public class MainActivity extends ActionBarActivity {
 		}
 
 	}
+
 }
