@@ -1,63 +1,109 @@
 package com.example.trackme;
 
-import java.util.Deque;
-
-import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.Intent;
-import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
-import android.hardware.SensorManager;
-import android.location.Criteria;
 import android.location.Location;
+import android.location.LocationListener;
 import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
-import android.telephony.TelephonyManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class MainActivity extends ActionBarActivity {
+	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 10; // in
+																		// Meters
+	private static final long MINIMUM_TIME_BETWEEN_UPDATE = 1000; // in
+																	// Millisecond
 	TextView tvMain;
 	TextView tvLocation;
-	double latitude, longitude;
-	final int EXITED_AREA = 0;
-	final int ENTERED_AREA = 0;
+	double latitude = 0, longitude = 0, oLatitude = 0, oLongitude = 0;
 	LocationManager locationManager;
 	String locationProvider;
+	long startTime;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_main);
 
 		// set up accelerometer
-		SensorManager sm = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-		if (sm.getSensorList(Sensor.TYPE_LINEAR_ACCELERATION).size() != 0) {
-			Sensor s = sm.getSensorList(Sensor.TYPE_LINEAR_ACCELERATION).get(0);
-			sm.registerListener(new AccelerationTracker(), s,
-					SensorManager.SENSOR_DELAY_NORMAL);
-		}
+		// SensorManager sm = (SensorManager)
+		// getSystemService(Context.SENSOR_SERVICE);
+		// if (sm.getSensorList(Sensor.TYPE_LINEAR_ACCELERATION).size() != 0) {
+		// Sensor s = sm.getSensorList(Sensor.TYPE_LINEAR_ACCELERATION).get(0);
+		// sm.registerListener(new AccelerationTracker(), s,
+		// SensorManager.SENSOR_DELAY_NORMAL);
+		// }
 
-		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-		Criteria crit = new Criteria();
-		crit.setAccuracy(Criteria.ACCURACY_FINE);
-		String locationProvider = locationManager.getBestProvider(crit, true);
-		Location loc = locationManager.getLastKnownLocation(locationProvider);
-		latitude = loc.getLatitude();
-		longitude = loc.getLongitude();
-		
-		Intent intent = new Intent(this, LocationUpdateReceiver.class);
-	    PendingIntent pendingIntent = PendingIntent.getBroadcast(this.getApplicationContext(), EXITED_AREA, intent, 0);
-	    locationManager.addProximityAlert(latitude, longitude, 1, -1, pendingIntent);
-
-		setContentView(R.layout.activity_main);
 		tvMain = (TextView) findViewById(R.id.tvMain);
 		tvLocation = (TextView) findViewById(R.id.tvLocation);
-		tvMain.setText("Maximum Accelerations");
-		tvLocation.setText(loc.getLatitude() + ", " + loc.getLongitude());
+
+		// location stuff
+		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
+				MINIMUM_TIME_BETWEEN_UPDATE, MINIMUM_DISTANCECHANGE_FOR_UPDATE,
+				new MyLocationListener());
+
+		startTime = System.currentTimeMillis();
+		tvMain.setText("Initial update: "
+				+ (System.currentTimeMillis() - startTime));
+		tvLocation.setText("Global: (" + getLatitude() + ", " + getLongitude()
+				+ ")" + "\nNetwork: (" + getNetworkLatitude() + ", "
+				+ getLongitude() + ")");
+	}
+
+	private double getLatitude() {
+		Location loc = locationManager
+				.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+
+		if (loc != null) {
+			return loc.getLatitude();
+		}
+		return 0;
+	}
+
+	private double getLongitude() {
+		Location loc = locationManager
+				.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+
+		if (loc != null) {
+			return loc.getLongitude();
+		}
+		return 0;
+	}
+
+	private double getNetworkLatitude() {
+		Location loc = locationManager
+				.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+
+		if (loc != null) {
+			return loc.getLatitude();
+		}
+		return 0;
+	}
+
+	private double getNetworkLongitude() {
+		Location loc = locationManager
+				.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
+
+		if (loc != null) {
+			return loc.getLongitude();
+		}
+		return 0;
+	}
+
+	@Override
+	protected void onStop() {
+		// TODO Auto-generated method stub
+		super.onStop();
+	}
+
+	@Override
+	protected void onDestroy() {
+		// TODO Auto-generated method stub
+		super.onDestroy();
 	}
 
 	@Override
@@ -79,30 +125,49 @@ public class MainActivity extends ActionBarActivity {
 		return super.onOptionsItemSelected(item);
 	}
 
-	private class AccelerationTracker implements SensorEventListener {
-		Deque<Float> prevXs;
+	private class MyLocationListener implements LocationListener {
 
 		@Override
-		public void onAccuracyChanged(Sensor arg0, int arg1) {
+		public void onLocationChanged(Location arg0) {
+			// TODO Auto-generated method stub
+			Toast.makeText(MainActivity.this, "Location changed",
+					Toast.LENGTH_LONG).show();
+			tvMain.setText(tvMain.getText() + "\nLast update time: "
+					+ (System.currentTimeMillis() - startTime));
+			tvLocation.setText("Global: (" + getLatitude() + ", "
+					+ getLongitude() + ")" + "\nNetwork: ("
+					+ getNetworkLatitude() + ", " + getLongitude() + ")");
+		}
+
+		@Override
+		public void onProviderDisabled(String arg0) {
 			// TODO Auto-generated method stub
 
 		}
 
 		@Override
-		public void onSensorChanged(SensorEvent e) {
-		}
-	}
+		public void onProviderEnabled(String arg0) {
+			// TODO Auto-generated method stub
 
-	private class LocationUpdateReceiver extends BroadcastReceiver {
+		}
 
 		@Override
-		public void onReceive(Context context, Intent intent) {
-			Bundle extras = intent.getExtras();
-			if (extras != null) {
-				Location loc = locationManager.getLastKnownLocation(locationProvider);
-				tvLocation.setText(loc.getLatitude() + ",, " + loc.getLongitude());
-//				int i = 7 / 0;
-			}
+		public void onStatusChanged(String arg0, int arg1, Bundle arg2) {
+			// TODO Auto-generated method stub
+
 		}
+
 	}
+
+	// private class AccelerationTracker implements SensorEventListener {
+	// @Override
+	// public void onAccuracyChanged(Sensor arg0, int arg1) {
+	// // TODO Auto-generated method stub
+	//
+	// }
+	//
+	// @Override
+	// public void onSensorChanged(SensorEvent e) {
+	// }
+	// }
 }
