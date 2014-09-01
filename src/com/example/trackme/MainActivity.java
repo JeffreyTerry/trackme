@@ -1,5 +1,9 @@
 package com.example.trackme;
 
+import java.util.Deque;
+import java.util.LinkedList;
+import java.util.Queue;
+
 import android.content.Context;
 import android.location.Location;
 import android.location.LocationListener;
@@ -9,13 +13,14 @@ import android.support.v7.app.ActionBarActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.TextView;
-import android.widget.Toast;
 
 public class MainActivity extends ActionBarActivity {
 	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 10; // in
 																		// Meters
 	private static final long MINIMUM_TIME_BETWEEN_UPDATE = 1000; // in
 																	// Millisecond
+	
+	Deque<Long> locationChangeTimes;
 	TextView tvMain;
 	TextView tvLocation;
 	double latitude = 0, longitude = 0, oLatitude = 0, oLongitude = 0;
@@ -28,30 +33,22 @@ public class MainActivity extends ActionBarActivity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-		// set up accelerometer
-		// SensorManager sm = (SensorManager)
-		// getSystemService(Context.SENSOR_SERVICE);
-		// if (sm.getSensorList(Sensor.TYPE_LINEAR_ACCELERATION).size() != 0) {
-		// Sensor s = sm.getSensorList(Sensor.TYPE_LINEAR_ACCELERATION).get(0);
-		// sm.registerListener(new AccelerationTracker(), s,
-		// SensorManager.SENSOR_DELAY_NORMAL);
-		// }
-
 		tvMain = (TextView) findViewById(R.id.tvMain);
 		tvLocation = (TextView) findViewById(R.id.tvLocation);
 
+		locationChangeTimes = new LinkedList<Long>();
+		startTime = System.currentTimeMillis();
+		
 		// location stuff
 		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
 		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
 				MINIMUM_TIME_BETWEEN_UPDATE, MINIMUM_DISTANCECHANGE_FOR_UPDATE,
 				new MyLocationListener());
 
-		startTime = System.currentTimeMillis();
-		tvMain.setText("Initial update: "
-				+ (System.currentTimeMillis() - startTime));
+		tvMain.setText("No location changes registered yet");
 		tvLocation.setText("Global: (" + getLatitude() + ", " + getLongitude()
 				+ ")" + "\nNetwork: (" + getNetworkLatitude() + ", "
-				+ getLongitude() + ")");
+				+ getNetworkLongitude() + ")");
 	}
 
 	private double getLatitude() {
@@ -130,13 +127,25 @@ public class MainActivity extends ActionBarActivity {
 		@Override
 		public void onLocationChanged(Location arg0) {
 			// TODO Auto-generated method stub
-			Toast.makeText(MainActivity.this, "Location changed",
-					Toast.LENGTH_LONG).show();
-			tvMain.setText(tvMain.getText() + "\nLast update time: "
-					+ (System.currentTimeMillis() - startTime));
-			tvLocation.setText("Global: (" + getLatitude() + ", "
-					+ getLongitude() + ")" + "\nNetwork: ("
-					+ getNetworkLatitude() + ", " + getLongitude() + ")");
+//			Toast.makeText(MainActivity.this, "Location changed",
+//					Toast.LENGTH_LONG).show();
+
+			String tvMainText = tvMain.getText().toString();
+			if(tvMainText.contentEquals("No location changes registered yet")){
+				tvMainText = "";
+			}
+			locationChangeTimes.add(System.currentTimeMillis() - startTime);
+			if(locationChangeTimes.size() > 15){
+				locationChangeTimes.poll();
+				tvMainText = tvMainText.substring(tvMainText.indexOf('\n'));
+			}
+			tvMainText += "Update time: " + locationChangeTimes.peekLast() + "\n";
+			
+			tvMain.setText(tvMainText);
+			
+			tvLocation.setText("Last GPS Position: (" + getLatitude() + ", "
+					+ getLongitude() + ")" + "\nLast Network Position: ("
+					+ getNetworkLatitude() + ", " + getNetworkLongitude() + ")");
 		}
 
 		@Override
@@ -158,16 +167,4 @@ public class MainActivity extends ActionBarActivity {
 		}
 
 	}
-
-	// private class AccelerationTracker implements SensorEventListener {
-	// @Override
-	// public void onAccuracyChanged(Sensor arg0, int arg1) {
-	// // TODO Auto-generated method stub
-	//
-	// }
-	//
-	// @Override
-	// public void onSensorChanged(SensorEvent e) {
-	// }
-	// }
 }
