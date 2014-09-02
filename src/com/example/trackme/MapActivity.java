@@ -10,6 +10,8 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
+import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.PolylineOptions;
 
 public class MapActivity extends Activity {
@@ -38,17 +40,19 @@ public class MapActivity extends Activity {
         	PolylineOptions po = new PolylineOptions().geodesic(true);
         	for(int i = 0; i < numOfLatitudes; i++){
         		po.add(new LatLng(latitudes[i], longitudes[i]));
-        		if(times[i] > 30000){  // if the user was at this location for more than 30 seconds
+        		if(times[i] > 120000){  // if the user was at this location for more than 120 seconds
         			int halfmax = 3600000 / 2;
         			int blue = (int) Math.max(0, 255 * (1 - (double) times[i] / halfmax));
         			int red = (int) Math.max(0, 255 * ((double) times[i] / halfmax - 1));
         			int green = 255 - blue - red;
+        			int time = (int) times[i];
         			map.addCircle(new CircleOptions()
         		     .center(new LatLng(latitudes[i], longitudes[i]))
-        		     .radius((times[i] / 10000.0) % 50)
-        		     .strokeColor(Color.YELLOW)
+        		     .radius((time / 10000.0) % 50)
+        		     .strokeColor(Color.RED)
         		     .strokeWidth(3)
         		     .fillColor(Color.rgb(red, green, blue))); // 14400000.0f (for 4 hours max)
+        			map.addMarker(new MarkerOptions().position(new LatLng(latitudes[i], longitudes[i])).title("Time: " + (time % 3600 > 0? time % 3600 + " hours, ": "") + time % 60 + " minutes"));
         		}
         	}
         	map.addPolyline(po);
