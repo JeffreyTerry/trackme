@@ -1,12 +1,14 @@
 package com.example.trackme;
 
 import android.app.Activity;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.widget.Toast;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.PolylineOptions;
 
@@ -23,17 +25,31 @@ public class MapActivity extends Activity {
         Bundle extras = getIntent().getExtras();
         double[] latitudes = extras.getDoubleArray("latitudes");
         double[] longitudes = extras.getDoubleArray("longitudes");
+        long[] times = extras.getLongArray("times");
         int numOfLatitudes = latitudes.length;
         int numOfLongitudes = latitudes.length;
+        int numOfTimes = times.length;
         
         
-        if(numOfLatitudes != 0 && numOfLongitudes != 0){
+        if(numOfLatitudes != 0 && numOfLongitudes != 0 && numOfTimes != 0){
         	Toast.makeText(this, "(" + latitudes[numOfLatitudes - 1] + ", " + longitudes[numOfLongitudes - 1] + ")", Toast.LENGTH_SHORT).show();
         	map.moveCamera(CameraUpdateFactory.newLatLngZoom(
                     new LatLng(latitudes[numOfLatitudes - 1], longitudes[numOfLongitudes - 1]), 16));
         	PolylineOptions po = new PolylineOptions().geodesic(true);
         	for(int i = 0; i < numOfLatitudes; i++){
         		po.add(new LatLng(latitudes[i], longitudes[i]));
+        		if(times[i] > 30000){  // if the user was at this location for more than 30 seconds
+        			int halfmax = 3600000 / 2;
+        			int blue = (int) Math.max(0, 255 * (1 - (double) times[i] / halfmax));
+        			int red = (int) Math.max(0, 255 * ((double) times[i] / halfmax - 1));
+        			int green = 255 - blue - red;
+        			map.addCircle(new CircleOptions()
+        		     .center(new LatLng(latitudes[i], longitudes[i]))
+        		     .radius((times[i] / 10000.0) % 50)
+        		     .strokeColor(Color.YELLOW)
+        		     .strokeWidth(3)
+        		     .fillColor(Color.rgb(red, green, blue))); // 14400000.0f (for 4 hours max)
+        		}
         	}
         	map.addPolyline(po);
         }

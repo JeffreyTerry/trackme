@@ -17,7 +17,7 @@ import android.widget.Button;
 import android.widget.TextView;
 
 public class MainActivity extends ActionBarActivity implements OnClickListener {
-	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 5; // in
+	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 10; // in
 																		// Meters
 	private static final long MINIMUM_TIME_BETWEEN_UPDATE = 2000; // in
 																	// Millisecond
@@ -195,16 +195,26 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 				if (locationLatitudes.size() > 0) {
 					double latitudes[] = new double[locationLatitudes.size()];
 					double longitudes[] = new double[locationLongitudes.size()];
+					long times[] = new long[locationChangeTimes.size()];
 					for (int i = 0; i < latitudes.length; i++) {
 						latitudes[i] = locationLatitudes.get(i);
 						longitudes[i] = locationLongitudes.get(i);
+						if (i < latitudes.length - 1) {
+							times[i] = locationChangeTimes.get(i + 1)
+									- locationChangeTimes.get(i);
+						} else {
+							times[i] = -1;
+						}
 					}
+					times[times.length - 1] = -1;
 					extras.putDoubleArray("latitudes", latitudes);
 					extras.putDoubleArray("longitudes", longitudes);
+					extras.putLongArray("times", times);
 					ourIntent.putExtras(extras);
 				} else {
 					extras.putDoubleArray("latitudes", new double[] {});
 					extras.putDoubleArray("longitudes", new double[] {});
+					extras.putLongArray("times", new long[] {});
 					ourIntent.putExtras(extras);
 				}
 
