@@ -17,7 +17,7 @@ import android.widget.Button;
 import android.widget.TextView;
 
 public class MainActivity extends ActionBarActivity implements OnClickListener {
-	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 20; // in
+	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 40; // in
 																		// Meters
 	private static final long MINIMUM_TIME_BETWEEN_UPDATE = 60000; // in
 																	// Millisecond

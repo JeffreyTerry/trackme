@@ -41,8 +41,8 @@ public class MapActivity extends Activity {
         		po.add(new LatLng(latitudes[i], longitudes[i]));
         		if(times[i] > 120000){  // if the user was at this location for more than 120 seconds
         			int halfmax = 3600000 / 2;
-        			int blue = (int) Math.max(0, 255 * (1 - (double) times[i] / halfmax));
-        			int red = (int) Math.max(0, 255 * ((double) times[i] / halfmax - 1));
+        			int blue = (int) Math.min(0, 255 * (1 - (double) times[i] / halfmax));
+        			int red = (int) Math.min(0, 255 * ((double) times[i] / halfmax - 1));
         			int green = 255 - blue - red;
         			long time = (int) times[i];
         			map.addCircle(new CircleOptions()
