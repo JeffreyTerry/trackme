@@ -1,112 +1,114 @@
 package com.example.trackme;
 
 import java.util.ArrayList;
+import java.util.concurrent.TimeoutException;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Bundle;
 import android.support.v7.app.ActionBarActivity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.TextView;
+import android.widget.ListView;
 
 public class MainActivity extends ActionBarActivity implements OnClickListener {
-	private static final long MINIMUM_DISTANCECHANGE_FOR_UPDATE = 35; // in
-																		// Meters
-	private static final long MINIMUM_TIME_BETWEEN_UPDATE = 120000; // in
-																	// Millisecond
+	private static final int ALARM_REQUEST_CODE = 897121234;
+	private static final long UPDATE_FREQUENCY = 150000;
+	private static final long TRACKER_TIMEOUT = 7200000;
+	private ListView mainListView;
+	private MainListViewAdapter mainArrayAdapter;
 
-	ArrayList<Long> locationChangeTimes;
-	ArrayList<Double> locationLatitudes, locationLongitudes;
-	TextView tvMain;
-	TextView tvLocation;
-	double latitude = 0, longitude = 0, oLatitude = 0, oLongitude = 0;
-	LocationManager locationManager;
-	String locationProvider;
-	long startTime;
+	private ArrayList<Double> speeds;
+	private ArrayList<Location> locations;
+	private ArrayList<Location> currentLocationPacket;
+	private LocationUpdateReceiver locationUpdateReceiver;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		killAllLocationAlarms();
 
-		tvMain = (TextView) findViewById(R.id.tvMain);
-		tvLocation = (TextView) findViewById(R.id.tvLocation);
+		speeds = new ArrayList<Double>();
+		locations = new ArrayList<Location>();
+		currentLocationPacket = new ArrayList<Location>();
 		Button bViewMap = (Button) findViewById(R.id.bViewMap);
 		bViewMap.setOnClickListener(this);
 
-		locationChangeTimes = new ArrayList<Long>();
-		locationLatitudes = new ArrayList<Double>();
-		locationLongitudes = new ArrayList<Double>();
-		startTime = System.currentTimeMillis();
-
-		// location stuff
-		locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
-		locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER,
-				MINIMUM_TIME_BETWEEN_UPDATE, MINIMUM_DISTANCECHANGE_FOR_UPDATE,
-				new MyLocationListener());
-
-		tvMain.setText("No location changes registered yet");
-		tvLocation.setText("Global: (" + getLatitude() + ", " + getLongitude()
-				+ ")" + "\nNetwork: (" + getNetworkLatitude() + ", "
-				+ getNetworkLongitude() + ")");
+		initializeListView();
+		IntentFilter i = new IntentFilter();
+		i.addAction("com.example.trackme.AlarmBroadcastReceiver.SpeedChange");
+		locationUpdateReceiver = new LocationUpdateReceiver();
+		registerReceiver(locationUpdateReceiver, i);
+		startLocationAlarm(UPDATE_FREQUENCY);
 	}
 
-	private double getLatitude() {
-		Location loc = locationManager
-				.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+	private void initializeListView() {
+		mainListView = (ListView) findViewById(R.id.lvMain);
+		ArrayList<MainListViewItem> values = new ArrayList<MainListViewItem>();
+		mainArrayAdapter = new MainListViewAdapter(this,
+				values);
 
-		if (loc != null) {
-			return loc.getLatitude();
-		}
-		return 0;
+		mainListView.setAdapter(mainArrayAdapter);
 	}
 
-	private double getLongitude() {
-		Location loc = locationManager
-				.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+	private void startLocationAlarm(long updateInterval) {
+		AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+		Intent intent = new Intent(this, AlarmBroadcastReceiver.class);
+		PendingIntent broadcastIntent = PendingIntent.getBroadcast(this,
+				ALARM_REQUEST_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT);
 
-		if (loc != null) {
-			return loc.getLongitude();
-		}
-		return 0;
+		alarmManager.setInexactRepeating(AlarmManager.RTC_WAKEUP,
+				System.currentTimeMillis() + updateInterval, updateInterval,
+				broadcastIntent);
 	}
 
-	private double getNetworkLatitude() {
-		Location loc = locationManager
-				.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-
-		if (loc != null) {
-			return loc.getLatitude();
-		}
-		return 0;
+	private void killAllLocationAlarms() {
+		Intent intentStop = new Intent(this, AlarmBroadcastReceiver.class);
+		PendingIntent senderstop = PendingIntent.getBroadcast(this,
+				ALARM_REQUEST_CODE, intentStop,
+				PendingIntent.FLAG_UPDATE_CURRENT);
+		AlarmManager alarmManagerStop = (AlarmManager) getSystemService(ALARM_SERVICE);
+		alarmManagerStop.cancel(senderstop);
 	}
-
-	private double getNetworkLongitude() {
-		Location loc = locationManager
-				.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
-
-		if (loc != null) {
-			return loc.getLongitude();
+	
+	@Override
+	protected void onResume() {
+		super.onResume();
+		if((locations.size() * UPDATE_FREQUENCY) >= TRACKER_TIMEOUT) {
+			locations.clear();
+			speeds.clear();
+			killAllLocationAlarms();
+			startLocationAlarm(AlarmBroadcastReceiver.DEFAULT_TIME_BETWEEN_UPDATES);
 		}
-		return 0;
 	}
 
 	@Override
 	protected void onStop() {
-		// TODO Auto-generated method stub
 		super.onStop();
 	}
 
 	@Override
 	protected void onDestroy() {
-		// TODO Auto-generated method stub
+		speeds.clear();
+		speeds = null;
+		locations.clear();
+		locations = null;
+		mainArrayAdapter.clear();
+		mainArrayAdapter = null;
+
+		killAllLocationAlarms();
+		unregisterReceiver(locationUpdateReceiver);
+
 		super.onDestroy();
 	}
 
@@ -129,101 +131,60 @@ public class MainActivity extends ActionBarActivity implements OnClickListener {
 		return super.onOptionsItemSelected(item);
 	}
 
-	private class MyLocationListener implements LocationListener {
-
-		@Override
-		public void onLocationChanged(Location l) {
-			// TODO Auto-generated method stub
-			// Toast.makeText(MainActivity.this, "Location changed",
-			// Toast.LENGTH_LONG).show();
-
-			locationChangeTimes.add(System.currentTimeMillis() - startTime);
-			locationLatitudes.add(l.getLatitude());
-			locationLongitudes.add(l.getLongitude());
-
-			String tvMainText = tvMain.getText().toString();
-			if (tvMainText.contentEquals("No location changes registered yet")) {
-				tvMainText = "\n";
-			}
-			if (locationChangeTimes.size() > 20) {
-				tvMainText = tvMainText.substring(tvMainText.indexOf('\n') + 1);
-			}
-			tvMainText += "Update time: "
-					+ locationChangeTimes.get(locationChangeTimes.size() - 1)
-					+ "\n";
-
-			tvMain.setText(tvMainText);
-
-			tvLocation
-					.setText("Last GPS Position: (" + l.getLatitude() + ", "
-							+ l.getLongitude() + ")"
-							+ "\nLast Network Position: ("
-							+ getNetworkLatitude() + ", "
-							+ getNetworkLongitude() + ")");
-		}
-
-		@Override
-		public void onProviderDisabled(String arg0) {
-			// TODO Auto-generated method stub
-
-		}
-
-		@Override
-		public void onProviderEnabled(String arg0) {
-			// TODO Auto-generated method stub
-
-		}
-
-		@Override
-		public void onStatusChanged(String arg0, int arg1, Bundle arg2) {
-			// TODO Auto-generated method stub
-
-		}
-
-	}
-
 	@Override
 	public void onClick(View v) {
 		switch (v.getId()) {
 		case R.id.bViewMap:
-			try {
-				Class mapClass = Class
-						.forName("com.example.trackme.MapActivity");
-				Intent ourIntent = new Intent(this, mapClass);
-
-				Bundle extras = new Bundle();
-				if (locationLatitudes.size() > 0) {
-					double latitudes[] = new double[locationLatitudes.size()];
-					double longitudes[] = new double[locationLongitudes.size()];
-					long times[] = new long[locationChangeTimes.size()];
-					for (int i = 0; i < latitudes.length; i++) {
-						latitudes[i] = locationLatitudes.get(i);
-						longitudes[i] = locationLongitudes.get(i);
-						if (i < latitudes.length - 1) {
-							times[i] = locationChangeTimes.get(i + 1)
-									- locationChangeTimes.get(i);
-						} else {
-							times[i] = -1;
-						}
-					}
-					times[times.length - 1] = -1;
-					extras.putDoubleArray("latitudes", latitudes);
-					extras.putDoubleArray("longitudes", longitudes);
-					extras.putLongArray("times", times);
-					ourIntent.putExtras(extras);
-				} else {
-					extras.putDoubleArray("latitudes", new double[] {});
-					extras.putDoubleArray("longitudes", new double[] {});
-					extras.putLongArray("times", new long[] {});
-					ourIntent.putExtras(extras);
+			Intent mapIntent = new Intent(this, MapActivity.class);
+			Bundle extras = new Bundle();
+			if (locations.size() > 0) {
+				extras.putParcelableArrayList("locations", locations);
+				double[] speedArr = new double[speeds.size()];
+				for (int i = 0; i < speedArr.length; i++) {
+					speedArr[i] = speeds.get(i);
 				}
-
-				startActivity(ourIntent);
-			} catch (ClassNotFoundException e) {
-				e.printStackTrace();
+				extras.putDoubleArray("speeds", speedArr);
+				mapIntent.putExtras(extras);
+			} else {
+				mapIntent.putExtras(extras);
 			}
+			startActivity(mapIntent);
 			break;
 		}
 	}
 
+	private class LocationUpdateReceiver extends BroadcastReceiver {
+		public void onReceive(Context context, Intent intent) {
+			Location location = (Location) intent
+					.getParcelableExtra("location");
+			if (location != null) {
+				currentLocationPacket.add(location);
+
+				// calculate speed here
+				if (currentLocationPacket.size() == AlarmBroadcastReceiver.DEFAULT_NUMBER_OF_UPDATES) {
+					double totalSpeed = 0;
+					for (int i = 0; i < currentLocationPacket.size(); i++) {
+						totalSpeed += currentLocationPacket.get(i).getSpeed();
+					}
+
+					// add the location in the middle of the current packet
+					locations.add(currentLocationPacket
+							.get(currentLocationPacket.size() / 2));
+					// add the average speed between the locations in the
+					// current packet
+					speeds.add(totalSpeed / locations.size());
+
+					MainListViewItem newItem = new MainListViewItem(locations.get(locations.size() - 1), speeds.get(speeds.size() - 1));
+					mainArrayAdapter.add(newItem);
+					
+					currentLocationPacket.clear();
+					
+					// stop tracking user at a certain time after last use
+					if ((locations.size() * UPDATE_FREQUENCY) >= TRACKER_TIMEOUT) {
+						killAllLocationAlarms();
+					}
+				}
+			}
+		}
+	}
 }
